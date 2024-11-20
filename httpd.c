@@ -7,6 +7,7 @@
 #include <sys/wait.h>
 #include <sys/stat.h>
 #include <string.h>
+#include <sysexits.h>
 
 #define PORT 1032
 
@@ -96,7 +97,14 @@ void handle_request(int nfd)
                args[0] = program;
                args[1] = NULL;
             }
-
+            char newpath[200];
+            //getcwd(newpath, sizeof(newpath));
+            char *cgi = "./cgi-like/";
+            strcat(newpath, cgi);
+            strcat(newpath, args[0]);
+            printf("newpath: %s\n", newpath);
+            //args[0] = newpath;
+            
             FILE *tmp = fopen(tmpname, "w+");
             if (tmp == NULL){
                perror("tmpfile");
@@ -106,17 +114,20 @@ void handle_request(int nfd)
             printf("tmp file created\n");
             
             signal(SIGCHLD, SIG_DFL);
+            
 
             pid_t pid = fork();
             if (pid == 0){
-               printf("program name: %s\n args: %s\n", program, args[0]);
+               printf("newpath name: %s\n args: %s\n", newpath, args[0]);
                dup2(fileno(tmp), STDOUT_FILENO);
                dup2(fileno(tmp), STDERR_FILENO);
                
-               execvp(program, args);
-               perror("exec");
-               fprintf(network, "HTTP/1.0 500 Internal Error\r\nContent-Type: text/html\r\n");
-               exit(1);
+               execvp(newpath, args);
+               //perror("exec");
+               fprintf(network, "HTTP/1.0 500 Internal Error\r\nContent-Type: text/html\r\n\r\n");
+
+               exit(EX_UNAVAILABLE);
+               
 
             }else if(pid > 0){
                int status;
@@ -132,20 +143,23 @@ void handle_request(int nfd)
                   size = mybuf.st_size;
                }
 
-            
-               fprintf(network, "HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n", (int)size);
-               char buffer[1024];
-               ssize_t n;
-               fclose(tmp);
-               tmp = fopen(tmpname, "r");
-               while(!feof(tmp)){
+               printf("\texit status %d\t and base status: %d\n", WEXITSTATUS(status), EX__BASE);
+      
+               if (WEXITSTATUS(status) == EX__BASE || WEXITSTATUS(status) == 0){
+                  fprintf(network, "HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n", (int)size);
+                  char buffer[1024];
+                  ssize_t n;
+                  fclose(tmp);
+                  tmp = fopen(tmpname, "r");
+                  while(!feof(tmp)){
 
-                  n = fread(buffer, sizeof(char),sizeof(buffer), tmp);
-                  fwrite(buffer, sizeof(char), n, network);
+                     n = fread(buffer, sizeof(char),sizeof(buffer), tmp);
+                     fwrite(buffer, sizeof(char), n, network);
+                     
+                  }
                   
                }
                fclose(tmp);
-               
             }else{
                fprintf(network, "HTTP/1.0 500 Internal Server Error\r\nContent-Type: text/html\r\n\r\n<pre>Internal Server Error</pre>\r\n");
             }
@@ -165,8 +179,9 @@ void handle_request(int nfd)
             if (lstat(path, &mybuf) != -1){
                size = mybuf.st_size;
             }
-            fprintf(network, "HTTP/1.0 200 OK\r\nContent-Type: text/html\r\nContent-Length: %d\r\n\r\n", (int)size);
             
+            fprintf(network, "HTTP/1.0 200 OK\r\nContent-Type: text/html\r\nContent-Length: %d\r\n\r\n", (int)size);
+           
             if (strncmp(token, "GET", 3) == 0){
                char buffer[1024];
                ssize_t n;
