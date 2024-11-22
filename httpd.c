@@ -181,10 +181,13 @@ void handle_request(int nfd)
          printf("path on disk == %s\n", b);
          FILE *fp = fopen(b, "r");
          if (fp == NULL){
+            printf("failed to open %s\n", b);
             fprintf(network, "HTTP/1.0 404 Not Found %s\r\nContent-Type: text/html\r\n\r\n<pre>Not Found</pre>\r\n", b);
-            break;
+            fclose(network);
+            free(line);
+            exit(1);
 
-         }else{
+         } else {
             struct stat mybuf;
             int size = 0;
 
@@ -207,22 +210,21 @@ void handle_request(int nfd)
                   fwrite(buffer, sizeof(char), n, network);
                   
                }
-         
+               
             }
 
-            //free(path);
+            
          }
-
-   
-      }else{
+         fclose(fp);
+      } else {
          fprintf(network, "HTTP/1.0 501 Not Implemented\r\nContent-Type: text/html\r\n\r\n<pre>Not Implemented</pre>\r\n");
       }
       printf("writing back to cilent\n");
-      fclose(network);
-      free(line);
       
    }
-
+   fclose(network);
+   free(line);
+   exit(1);
 }
 
 void run_service(int fd)

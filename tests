@@ -1,0 +1,15 @@
+#!/bin/sh -x
+
+
+curl -i http://localhost:1040/bogus-file -o -
+
+
+curl -i http://localhost:1040/test.html -o -
+
+curl --head http://localhost:1040/test.html -o -
+
+curl -i http://localhost:1040/cgi-like/who -o -
+
+curl -i http://localhost:1040/cgi-like/bogus-program -o -
+
+curl -i http://localhost:1040/cgi-like/date?-u -o -
