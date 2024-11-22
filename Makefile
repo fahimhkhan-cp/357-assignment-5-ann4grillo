@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -std=c99 -pedantic
+CFLAGS = -Wall -std=c99 -pedantic -g
 CLIENT = client
 CLIENT_OBJS = client.o
 SERVER = httpd

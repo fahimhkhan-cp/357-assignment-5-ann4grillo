@@ -30,9 +30,9 @@ void handle_request(int nfd)
 
    sprintf(tmpname, "/tmp/anna-tmp-%d", getpid());
    FILE *network = fdopen(nfd, "a+");
+
    if (network == NULL)
    {
-      fprintf(network, "HTTP/1.0 500 Internal Error\r\nContent-Type: text/html\r\n<pre>Internal Error</pre>\r\n\r\n");
       perror("fdopen");
       close(nfd);
       return;
@@ -111,13 +111,14 @@ void handle_request(int nfd)
             if (tmp == NULL){
                perror("tmpfile");
                fprintf(network, "HTTP/1.0 500 Internal Error\r\nContent-Type: text/html\r\n");
+               fclose(network);
+               free(line);
                exit(1);
             }
             printf("tmp file created\n");
             
             signal(SIGCHLD, SIG_DFL);
             
-
             pid_t pid = fork();
             if (pid == 0){
                printf("newpath name: %s\n args: %s\n", newpath, args[0]);
@@ -126,8 +127,11 @@ void handle_request(int nfd)
                
                execvp(newpath, args);
                //perror("exec");
-               fprintf(network, "HTTP/1.0 404 Not Found\r\nContent-Type: text/html\r\n\r\n<pre>Not Found</pre>\r\n");
+               fprintf(network, "HTTP/1.0 404 cgi Not Found\r\nContent-Type: text/html\r\n\r\n<pre>Not Found</pre>\r\n");
                fprintf(network, "\ttest\n");
+               fclose(network);
+               fclose(tmp);
+               free(line);
                exit(EX_UNAVAILABLE);
                
 
@@ -167,22 +171,24 @@ void handle_request(int nfd)
                fprintf(network, "HTTP/1.0 500 Internal Server Error\r\nContent-Type: text/html\r\n\r\n<pre>Internal Server Error</pre>\r\n");
             }
             unlink(tmpname);
+            fclose(network);
+            free(line);
             exit(1);
          }
-         char b[200];
-         strcat(b, ".");
+         char b[1024];
+	      getcwd(b, sizeof(b));
          strcat(b, path);
-         printf("%s\n", b);
+         printf("path on disk == %s\n", b);
          FILE *fp = fopen(b, "r");
          if (fp == NULL){
-            fprintf(network, "HTTP/1.0 404 Not Found\r\nContent-Type: text/html\r\n\r\n<pre>Not Found</pre>\r\n");
+            fprintf(network, "HTTP/1.0 404 Not Found %s\r\nContent-Type: text/html\r\n\r\n<pre>Not Found</pre>\r\n", b);
             break;
 
          }else{
             struct stat mybuf;
             int size = 0;
 
-            if (lstat(path, &mybuf) != -1){
+            if (lstat(b, &mybuf) != -1){
                size = mybuf.st_size;
             }
             
@@ -207,7 +213,7 @@ void handle_request(int nfd)
             //free(path);
          }
 
-      
+   
       }else{
          fprintf(network, "HTTP/1.0 501 Not Implemented\r\nContent-Type: text/html\r\n\r\n<pre>Not Implemented</pre>\r\n");
       }
@@ -217,7 +223,6 @@ void handle_request(int nfd)
       
    }
 
-   
 }
 
 void run_service(int fd)
@@ -235,6 +240,7 @@ void run_service(int fd)
             close(fd);
             handle_request(nfd);
             printf("Connection closed\n");
+            close(nfd);
             exit(0);
 
          }else if (pid > 0){
