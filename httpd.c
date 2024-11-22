@@ -32,7 +32,7 @@ void handle_request(int nfd)
    FILE *network = fdopen(nfd, "a+");
    if (network == NULL)
    {
-      fprintf(network, "HTTP/1.0 500 Internal Error\r\nContent-Type: text/html\r\n");
+      fprintf(network, "HTTP/1.0 500 Internal Error\r\nContent-Type: text/html\r\n<pre>Internal Error</pre>\r\n\r\n");
       perror("fdopen");
       close(nfd);
       return;
@@ -90,7 +90,8 @@ void handle_request(int nfd)
                   
                }
                args[argcount] = NULL;
- 
+            
+               free(start);
             }else{
                program = strtok(path+10, " ");
                printf("program no args: %s\n", program);
@@ -98,6 +99,7 @@ void handle_request(int nfd)
                args[1] = NULL;
             }
             char newpath[200];
+            newpath[0] = '\0';
             //getcwd(newpath, sizeof(newpath));
             char *cgi = "./cgi-like/";
             strcat(newpath, cgi);
@@ -124,8 +126,8 @@ void handle_request(int nfd)
                
                execvp(newpath, args);
                //perror("exec");
-               fprintf(network, "HTTP/1.0 500 Internal Error\r\nContent-Type: text/html\r\n\r\n");
-
+               fprintf(network, "HTTP/1.0 404 Not Found\r\nContent-Type: text/html\r\n\r\n<pre>Not Found</pre>\r\n");
+               fprintf(network, "\ttest\n");
                exit(EX_UNAVAILABLE);
                
 
@@ -148,12 +150,13 @@ void handle_request(int nfd)
                if (WEXITSTATUS(status) == EX__BASE || WEXITSTATUS(status) == 0){
                   fprintf(network, "HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n", (int)size);
                   char buffer[1024];
+                  //buffer[1023] = '\0';
                   ssize_t n;
                   fclose(tmp);
                   tmp = fopen(tmpname, "r");
                   while(!feof(tmp)){
 
-                     n = fread(buffer, sizeof(char),sizeof(buffer), tmp);
+                     n = fread(buffer, sizeof(char), sizeof(buffer), tmp);
                      fwrite(buffer, sizeof(char), n, network);
                      
                   }
@@ -166,8 +169,11 @@ void handle_request(int nfd)
             unlink(tmpname);
             exit(1);
          }
-         
-         FILE *fp = fopen(path, "r");
+         char b[200];
+         strcat(b, ".");
+         strcat(b, path);
+         printf("%s\n", b);
+         FILE *fp = fopen(b, "r");
          if (fp == NULL){
             fprintf(network, "HTTP/1.0 404 Not Found\r\nContent-Type: text/html\r\n\r\n<pre>Not Found</pre>\r\n");
             break;
@@ -184,26 +190,33 @@ void handle_request(int nfd)
            
             if (strncmp(token, "GET", 3) == 0){
                char buffer[1024];
+               //buffer[1023] = '\0';
                ssize_t n;
 
                while(!feof(fp)){
 
                   //printf("entered while\n");
-                  n = fread(buffer, sizeof(char),sizeof(buffer), fp);
+                  n = fread(buffer, sizeof(char), sizeof(buffer), fp);
                   //printf("n:%d\n", (int) n);
                   fwrite(buffer, sizeof(char), n, network);
                   
                }
          
             }
+
+            //free(path);
          }
+
+      
       }else{
          fprintf(network, "HTTP/1.0 501 Not Implemented\r\nContent-Type: text/html\r\n\r\n<pre>Not Implemented</pre>\r\n");
       }
       printf("writing back to cilent\n");
+      fclose(network);
+      free(line);
+      
    }
-   fclose(network);
-   free(line);
+
    
 }
 
